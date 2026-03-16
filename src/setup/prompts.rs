@@ -123,15 +123,32 @@ pub fn select_many(prompt: &str, options: &[(&str, bool)]) -> io::Result<Vec<usi
             writeln!(stdout, "\r")?;
 
             for (i, (label, _)) in options.iter().enumerate() {
-                let checkbox = if selected[i] { "[x]" } else { "[ ]" };
-                let prefix = if i == cursor_pos { ">" } else { " " };
-
                 if i == cursor_pos {
+                    // Cursor line: cyan cursor, then colored checkbox
                     execute!(stdout, SetForegroundColor(Color::Cyan))?;
-                    writeln!(stdout, "  {} {} {}\r", prefix, checkbox, label)?;
+                    write!(stdout, "  \u{25b8} ")?;
+                    if selected[i] {
+                        execute!(stdout, SetForegroundColor(Color::Green))?;
+                        write!(stdout, "[\u{2713}]")?;
+                    } else {
+                        execute!(stdout, SetForegroundColor(Color::DarkGrey))?;
+                        write!(stdout, "[\u{00b7}]")?;
+                    }
+                    execute!(stdout, SetForegroundColor(Color::Cyan))?;
+                    writeln!(stdout, " {}\r", label)?;
                     execute!(stdout, ResetColor)?;
                 } else {
-                    writeln!(stdout, "  {} {} {}\r", prefix, checkbox, label)?;
+                    write!(stdout, "    ")?;
+                    if selected[i] {
+                        execute!(stdout, SetForegroundColor(Color::Green))?;
+                        write!(stdout, "[\u{2713}]")?;
+                        execute!(stdout, ResetColor)?;
+                    } else {
+                        execute!(stdout, SetForegroundColor(Color::DarkGrey))?;
+                        write!(stdout, "[\u{00b7}]")?;
+                        execute!(stdout, ResetColor)?;
+                    }
+                    writeln!(stdout, " {}\r", label)?;
                 }
             }
 
@@ -310,9 +327,9 @@ pub fn print_header(text: &str) {
     let border = "─".repeat(width);
 
     println!();
-    println!("╭{}╮", border);
+    println!("┌{}┐", border);
     println!("│  {}  │", text);
-    println!("╰{}╯", border);
+    println!("└{}┘", border);
     println!();
 }
 
@@ -326,8 +343,27 @@ pub fn print_header(text: &str) {
 /// //         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 /// ```
 pub fn print_step(current: usize, total: usize, name: &str) {
-    println!("Step {}/{}: {}", current, total, name);
-    println!("{}", "━".repeat(32));
+    println!("Step {} of {}: {}", current, total, name);
+
+    let bar_width: usize = 30;
+    let filled = if total == 0 {
+        0
+    } else {
+        (current * bar_width) / total
+    };
+    let unfilled = bar_width - filled;
+    let percent = if total == 0 {
+        0
+    } else {
+        (current * 100) / total
+    };
+
+    println!(
+        "{}{}  {}%",
+        "━".repeat(filled),
+        "░".repeat(unfilled),
+        percent
+    );
     println!();
 }
 

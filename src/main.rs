@@ -36,10 +36,49 @@ fn main() -> anyhow::Result<()> {
     let _ = dotenvy::dotenv();
     ironclaw::bootstrap::load_ironclaw_env();
 
-    tokio::runtime::Builder::new_multi_thread()
+    let result = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?
-        .block_on(async_main())
+        .block_on(async_main());
+
+    if let Err(ref e) = result {
+        format_top_level_error(e);
+    }
+    result
+}
+
+/// Format a top-level error with color and recovery hints.
+fn format_top_level_error(err: &anyhow::Error) {
+    use ironclaw::cli::fmt;
+    let msg = format!("{err:#}");
+
+    eprintln!();
+    eprintln!("  {}\u{2717}{} {}", fmt::error(), fmt::reset(), msg);
+
+    // Provide recovery hints for common errors
+    let lower = msg.to_ascii_lowercase();
+    let hint = if lower.contains("database_url")
+        || lower.contains("database") && lower.contains("not set")
+    {
+        Some("run `ironclaw onboard` or set DATABASE_URL in .env")
+    } else if lower.contains("connection refused") || lower.contains("connect error") {
+        Some("check that the database server is running")
+    } else if lower.contains("session") && lower.contains("not found") {
+        Some("run `ironclaw onboard` to set up authentication")
+    } else if lower.contains("secrets_master_key") {
+        Some("run `ironclaw onboard` or set SECRETS_MASTER_KEY in .env")
+    } else if lower.contains("already running") {
+        Some("stop the other instance or remove the stale PID file")
+    } else if lower.contains("onboard") {
+        Some("run `ironclaw onboard` to complete setup")
+    } else {
+        None
+    };
+
+    if let Some(hint_text) = hint {
+        eprintln!("  {}hint:{} {}", fmt::dim(), fmt::reset(), hint_text,);
+    }
+    eprintln!();
 }
 
 async fn async_main() -> anyhow::Result<()> {
@@ -183,6 +222,8 @@ async fn async_main() -> anyhow::Result<()> {
             None
         }
     };
+
+    let startup_start = std::time::Instant::now();
 
     // ── Agent startup ──────────────────────────────────────────────────
 
@@ -602,6 +643,7 @@ async fn async_main() -> anyhow::Result<()> {
                 .and_then(|t| t.public_url())
                 .or_else(|| config.tunnel.public_url.clone()),
             tunnel_provider: active_tunnel.as_ref().map(|t| t.name().to_string()),
+            startup_elapsed: Some(startup_start.elapsed()),
         };
         ironclaw::boot_screen::print_boot_screen(&boot_info);
     }

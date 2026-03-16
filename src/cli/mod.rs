@@ -18,6 +18,7 @@ mod channels;
 mod completion;
 mod config;
 mod doctor;
+pub mod fmt;
 #[cfg(feature = "import")]
 pub mod import;
 mod logs;

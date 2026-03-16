@@ -40,7 +40,7 @@
         <button id="auth-connect-btn" data-i18n="auth.connect">Connect</button>
       </div>
       <div id="auth-error"></div>
-      <p class="auth-hint" data-i18n="auth.hint">Enter the GATEWAY_AUTH_TOKEN from your .env configuration.</p>
+      <p class="auth-hint" data-i18n="auth.hint">Paste the token shown in your terminal to connect.</p>
     </div>
   </div>
 
@@ -90,12 +90,12 @@
   <!-- Main App (hidden until authenticated) -->
   <div id="app">
     <!-- Tab Bar -->
-    <div class="tab-bar">
-      <button class="active" data-tab="chat" data-i18n="tab.chat">Chat</button>
-      <button data-tab="memory" data-i18n="tab.memory">Memory</button>
-      <button data-tab="jobs" data-i18n="tab.jobs">Jobs</button>
-      <button data-tab="routines" data-i18n="tab.routines">Routines</button>
-      <button data-tab="settings" data-i18n="tab.settings">Settings</button>
+    <div class="tab-bar" role="tablist">
+      <button class="active" data-tab="chat" data-i18n="tab.chat" role="tab" aria-selected="true">Chat</button>
+      <button data-tab="memory" data-i18n="tab.memory" role="tab" aria-selected="false">Memory</button>
+      <button data-tab="jobs" data-i18n="tab.jobs" role="tab" aria-selected="false">Jobs</button>
+      <button data-tab="routines" data-i18n="tab.routines" role="tab" aria-selected="false">Routines</button>
+      <button data-tab="settings" data-i18n="tab.settings" role="tab" aria-selected="false">Settings</button>
       <div class="spacer"></div>
 
       <!-- Language Switcher -->
@@ -133,7 +133,7 @@
     </div>
 
     <!-- Chat Tab -->
-    <div class="tab-panel active" id="tab-chat">
+    <div class="tab-panel active" id="tab-chat" role="tabpanel">
       <div class="thread-sidebar" id="thread-sidebar">
         <div class="assistant-item" id="assistant-thread">
           <span class="assistant-label" id="assistant-label" data-i18n="chat.assistant">Assistant</span>
@@ -168,7 +168,7 @@
     </div>
 
     <!-- Memory Tab -->
-    <div class="tab-panel" id="tab-memory">
+    <div class="tab-panel" id="tab-memory" role="tabpanel">
       <div class="memory-container">
         <div class="memory-sidebar">
           <div class="search-box">
@@ -196,7 +196,7 @@
     </div>
 
     <!-- Jobs Tab -->
-    <div class="tab-panel" id="tab-jobs">
+    <div class="tab-panel" id="tab-jobs" role="tabpanel">
       <div class="jobs-container">
         <div class="jobs-summary" id="jobs-summary"></div>
         <table class="jobs-table" id="jobs-table">
@@ -217,7 +217,7 @@
     </div>
 
     <!-- Logs Tab -->
-    <div class="tab-panel" id="tab-logs">
+    <div class="tab-panel" id="tab-logs" role="tabpanel">
       <div class="logs-container">
         <div class="logs-toolbar">
           <select id="logs-server-level" title="Server-side log level (changes what the server emits)">
@@ -243,7 +243,7 @@
     </div>
 
     <!-- Routines Tab -->
-    <div class="tab-panel" id="tab-routines">
+    <div class="tab-panel" id="tab-routines" role="tabpanel">
       <div class="routines-container">
         <div class="routines-summary" id="routines-summary"></div>
         <table class="routines-table" id="routines-table">
@@ -269,7 +269,7 @@
     </div>
 
     <!-- Settings Tab -->
-    <div class="tab-panel" id="tab-settings">
+    <div class="tab-panel" id="tab-settings" role="tabpanel">
       <div class="settings-layout">
         <div class="settings-sidebar">
           <button class="settings-subtab active" data-settings-subtab="inference" data-i18n="settings.inference">Inference</button>

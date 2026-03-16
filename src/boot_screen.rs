@@ -4,6 +4,8 @@
 //! state: model, database, tool count, enabled features, active channels,
 //! and the gateway URL.
 
+use crate::cli::fmt;
+
 /// All displayable fields for the boot screen.
 pub struct BootInfo {
     pub version: String,
@@ -29,38 +31,53 @@ pub struct BootInfo {
     pub tunnel_url: Option<String>,
     /// Provider name for the managed tunnel (e.g., "ngrok").
     pub tunnel_provider: Option<String>,
+    /// Time elapsed during startup. Shown at the bottom when present.
+    pub startup_elapsed: Option<std::time::Duration>,
 }
+
+const KW: usize = 10;
 
 /// Print the boot screen to stdout.
 pub fn print_boot_screen(info: &BootInfo) {
-    // ANSI codes matching existing REPL palette
-    let bold = "\x1b[1m";
-    let cyan = "\x1b[36m";
-    let dim = "\x1b[90m";
-    let yellow = "\x1b[33m";
-    let yellow_underline = "\x1b[33;4m";
-    let reset = "\x1b[0m";
-
-    let border = format!("  {dim}{}{reset}", "\u{2576}".repeat(58));
+    let border = format!("  {}", fmt::separator(58));
 
     println!();
     println!("{border}");
     println!();
-    println!("  {bold}{}{reset} v{}", info.agent_name, info.version);
+    println!(
+        "  {}{}{} v{}",
+        fmt::bold(),
+        info.agent_name,
+        fmt::reset(),
+        info.version
+    );
     println!();
 
-    // Model line
+    // Model line — complex (multiple styled parts), so manual formatting
     let model_display = if let Some(ref cheap) = info.cheap_model {
         format!(
-            "{cyan}{}{reset}  {dim}cheap{reset} {cyan}{}{reset}",
-            info.llm_model, cheap
+            "{}{}{}  {}cheap{} {}{}{}",
+            fmt::accent(),
+            info.llm_model,
+            fmt::reset(),
+            fmt::dim(),
+            fmt::reset(),
+            fmt::accent(),
+            cheap,
+            fmt::reset(),
         )
     } else {
-        format!("{cyan}{}{reset}", info.llm_model)
+        format!("{}{}{}", fmt::accent(), info.llm_model, fmt::reset())
     };
     println!(
-        "  {dim}model{reset}     {model_display}  {dim}via {}{reset}",
-        info.llm_backend
+        "  {}{:<width$}{}  {model_display}  {}via {}{}",
+        fmt::dim(),
+        "model",
+        fmt::reset(),
+        fmt::dim(),
+        info.llm_backend,
+        fmt::reset(),
+        width = KW,
     );
 
     // Database line
@@ -69,18 +86,14 @@ pub fn print_boot_screen(info: &BootInfo) {
     } else {
         "none"
     };
-    println!(
-        "  {dim}database{reset}  {cyan}{}{reset} {dim}({db_status}){reset}",
-        info.db_backend
-    );
+    let db_value = format!("{} ({})", info.db_backend, db_status);
+    println!("{}", fmt::kv_line("database", &db_value, KW));
 
     // Tools line
-    println!(
-        "  {dim}tools{reset}     {cyan}{}{reset} {dim}registered{reset}",
-        info.tool_count
-    );
+    let tools_value = format!("{} registered", info.tool_count);
+    println!("{}", fmt::kv_line("tools", &tools_value, KW));
 
-    // Features line
+    // Features line — complex (multiple items, some with warnings), so manual formatting
     let mut features = Vec::new();
     if info.embeddings_enabled {
         if let Some(ref provider) = info.embeddings_provider {
@@ -98,10 +111,18 @@ pub fn print_boot_screen(info: &BootInfo) {
             features.push("sandbox".to_string());
         }
         crate::sandbox::detect::DockerStatus::NotInstalled => {
-            features.push(format!("{yellow}sandbox (docker not installed){reset}"));
+            features.push(format!(
+                "{}sandbox (docker not installed){}",
+                fmt::warning(),
+                fmt::reset()
+            ));
         }
         crate::sandbox::detect::DockerStatus::NotRunning => {
-            features.push(format!("{yellow}sandbox (docker not running){reset}"));
+            features.push(format!(
+                "{}sandbox (docker not running){}",
+                fmt::warning(),
+                fmt::reset()
+            ));
         }
         crate::sandbox::detect::DockerStatus::Disabled => {
             // Don't show sandbox when disabled
@@ -118,23 +139,45 @@ pub fn print_boot_screen(info: &BootInfo) {
     }
     if !features.is_empty() {
         println!(
-            "  {dim}features{reset}  {cyan}{}{reset}",
-            features.join("  ")
+            "  {}{:<width$}{}  {}{}{}",
+            fmt::dim(),
+            "features",
+            fmt::reset(),
+            fmt::accent(),
+            features.join("  "),
+            fmt::reset(),
+            width = KW,
         );
     }
 
     // Channels line
     if !info.channels.is_empty() {
+        let channels_value = info.channels.join("  ");
         println!(
-            "  {dim}channels{reset}  {cyan}{}{reset}",
-            info.channels.join("  ")
+            "  {}{:<width$}{}  {}{}{}",
+            fmt::dim(),
+            "channels",
+            fmt::reset(),
+            fmt::accent(),
+            channels_value,
+            fmt::reset(),
+            width = KW,
         );
     }
 
     // Gateway URL (highlighted)
     if let Some(ref url) = info.gateway_url {
         println!();
-        println!("  {dim}gateway{reset}   {yellow_underline}{url}{reset}");
+        println!(
+            "  {}{:<width$}{}  {}{}{}",
+            fmt::dim(),
+            "gateway",
+            fmt::reset(),
+            fmt::link(),
+            url,
+            fmt::reset(),
+            width = KW,
+        );
     }
 
     // Tunnel URL
@@ -142,15 +185,36 @@ pub fn print_boot_screen(info: &BootInfo) {
         let provider_tag = info
             .tunnel_provider
             .as_deref()
-            .map(|p| format!(" {dim}({p}){reset}"))
+            .map(|p| format!(" {}({}){}", fmt::dim(), p, fmt::reset()))
             .unwrap_or_default();
-        println!("  {dim}tunnel{reset}    {yellow_underline}{url}{reset}{provider_tag}");
+        println!(
+            "  {}{:<width$}{}  {}{}{}{}",
+            fmt::dim(),
+            "tunnel",
+            fmt::reset(),
+            fmt::link(),
+            url,
+            fmt::reset(),
+            provider_tag,
+            width = KW,
+        );
     }
 
     println!();
     println!("{border}");
-    println!();
-    println!("  /help for commands, /quit to exit");
+
+    // Startup elapsed
+    if let Some(elapsed) = info.startup_elapsed {
+        let millis = elapsed.as_millis();
+        let elapsed_str = if millis < 1000 {
+            format!("{millis}ms")
+        } else {
+            let secs = elapsed.as_secs_f64();
+            format!("{secs:.1}s")
+        };
+        println!("  {}ready in {}{}", fmt::dim(), elapsed_str, fmt::reset());
+    }
+
     println!();
 }
 
@@ -187,6 +251,7 @@ mod tests {
             ],
             tunnel_url: Some("https://abc123.ngrok.io".to_string()),
             tunnel_provider: Some("ngrok".to_string()),
+            startup_elapsed: None,
         };
         // Should not panic
         print_boot_screen(&info);
@@ -216,6 +281,7 @@ mod tests {
             channels: vec![],
             tunnel_url: None,
             tunnel_provider: None,
+            startup_elapsed: None,
         };
         // Should not panic
         print_boot_screen(&info);
@@ -245,6 +311,7 @@ mod tests {
             channels: vec!["repl".to_string()],
             tunnel_url: None,
             tunnel_provider: None,
+            startup_elapsed: None,
         };
         // Should not panic
         print_boot_screen(&info);

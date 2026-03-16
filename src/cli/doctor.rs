@@ -7,12 +7,14 @@
 use std::path::PathBuf;
 
 use crate::bootstrap::ironclaw_base_dir;
+use crate::cli::fmt;
 use crate::settings::Settings;
 
 /// Run all diagnostic checks and print results.
 pub async fn run_doctor_command() -> anyhow::Result<()> {
-    println!("IronClaw Doctor");
-    println!("===============\n");
+    println!();
+    println!("  {}IronClaw Doctor{}", fmt::bold(), fmt::reset());
+    println!();
 
     let mut passed = 0u32;
     let mut failed = 0u32;
@@ -158,7 +160,18 @@ pub async fn run_doctor_command() -> anyhow::Result<()> {
     // ── Summary ───────────────────────────────────────────────
 
     println!();
-    println!("  {passed} passed, {failed} failed, {skipped} skipped");
+    println!(
+        "  {}{} passed{}, {}{} failed{}, {}{} skipped{}",
+        fmt::success(),
+        passed,
+        fmt::reset(),
+        if failed > 0 { fmt::error() } else { fmt::dim() },
+        failed,
+        fmt::reset(),
+        fmt::dim(),
+        skipped,
+        fmt::reset(),
+    );
 
     if failed > 0 {
         println!("\n  Some checks failed. This is normal if you don't use those features.");
@@ -173,15 +186,24 @@ fn check(name: &str, result: CheckResult, passed: &mut u32, failed: &mut u32, sk
     match result {
         CheckResult::Pass(detail) => {
             *passed += 1;
-            println!("  [pass] {name}: {detail}");
+            println!(
+                "{}",
+                fmt::check_line(fmt::StatusKind::Pass, name, &detail, 18)
+            );
         }
         CheckResult::Fail(detail) => {
             *failed += 1;
-            println!("  [FAIL] {name}: {detail}");
+            println!(
+                "{}",
+                fmt::check_line(fmt::StatusKind::Fail, name, &detail, 18)
+            );
         }
         CheckResult::Skip(reason) => {
             *skipped += 1;
-            println!("  [skip] {name}: {reason}");
+            println!(
+                "{}",
+                fmt::check_line(fmt::StatusKind::Skip, name, &reason, 18)
+            );
         }
     }
 }
