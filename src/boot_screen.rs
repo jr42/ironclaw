@@ -1,8 +1,9 @@
 //! Boot screen displayed after all initialization completes.
 //!
-//! Shows a polished ANSI-styled status panel summarizing the agent's runtime
-//! state: model, database, tool count, enabled features, active channels,
-//! and the gateway URL.
+//! Shows a compact ANSI-styled status panel with three tiers:
+//! - **Tier 1 (always):** Name + version, model + backend.
+//! - **Tier 2 (conditional):** Gateway URL, tunnel URL, non-default channels.
+//! - **Tier 3 (removed):** Database, tool count, features → use `ironclaw status`.
 
 use crate::cli::fmt;
 
@@ -38,12 +39,19 @@ pub struct BootInfo {
 const KW: usize = 10;
 
 /// Print the boot screen to stdout.
+///
+/// **Tier 1 (always):** Name + version, model + backend.
+/// **Tier 2 (conditional):** Gateway URL, tunnel URL, non-default channels.
+/// **Tier 3 (removed):** Database, tool count, features — use `ironclaw status`.
 pub fn print_boot_screen(info: &BootInfo) {
     let border = format!("  {}", fmt::separator(58));
 
     println!();
     println!("{border}");
     println!();
+
+    // ── Tier 1: always shown ──────────────────────────────────────────
+
     println!(
         "  {}{}{} v{}",
         fmt::bold(),
@@ -53,7 +61,7 @@ pub fn print_boot_screen(info: &BootInfo) {
     );
     println!();
 
-    // Model line — complex (multiple styled parts), so manual formatting
+    // Model line
     let model_display = if let Some(ref cheap) = info.cheap_model {
         format!(
             "{}{}{}  {}cheap{} {}{}{}",
@@ -80,94 +88,10 @@ pub fn print_boot_screen(info: &BootInfo) {
         width = KW,
     );
 
-    // Database line
-    let db_status = if info.db_connected {
-        "connected"
-    } else {
-        "none"
-    };
-    let db_value = format!("{} ({})", info.db_backend, db_status);
-    println!("{}", fmt::kv_line("database", &db_value, KW));
+    // ── Tier 2: conditional ───────────────────────────────────────────
 
-    // Tools line
-    let tools_value = format!("{} registered", info.tool_count);
-    println!("{}", fmt::kv_line("tools", &tools_value, KW));
-
-    // Features line — complex (multiple items, some with warnings), so manual formatting
-    let mut features = Vec::new();
-    if info.embeddings_enabled {
-        if let Some(ref provider) = info.embeddings_provider {
-            features.push(format!("embeddings ({provider})"));
-        } else {
-            features.push("embeddings".to_string());
-        }
-    }
-    if info.heartbeat_enabled {
-        let mins = info.heartbeat_interval_secs / 60;
-        features.push(format!("heartbeat ({mins}m)"));
-    }
-    match info.docker_status {
-        crate::sandbox::detect::DockerStatus::Available => {
-            features.push("sandbox".to_string());
-        }
-        crate::sandbox::detect::DockerStatus::NotInstalled => {
-            features.push(format!(
-                "{}sandbox (docker not installed){}",
-                fmt::warning(),
-                fmt::reset()
-            ));
-        }
-        crate::sandbox::detect::DockerStatus::NotRunning => {
-            features.push(format!(
-                "{}sandbox (docker not running){}",
-                fmt::warning(),
-                fmt::reset()
-            ));
-        }
-        crate::sandbox::detect::DockerStatus::Disabled => {
-            // Don't show sandbox when disabled
-        }
-    }
-    if info.claude_code_enabled {
-        features.push("claude-code".to_string());
-    }
-    if info.routines_enabled {
-        features.push("routines".to_string());
-    }
-    if info.skills_enabled {
-        features.push("skills".to_string());
-    }
-    if !features.is_empty() {
-        println!(
-            "  {}{:<width$}{}  {}{}{}",
-            fmt::dim(),
-            "features",
-            fmt::reset(),
-            fmt::accent(),
-            features.join("  "),
-            fmt::reset(),
-            width = KW,
-        );
-    }
-
-    // Channels line
-    if !info.channels.is_empty() {
-        let channels_value = info.channels.join("  ");
-        println!(
-            "  {}{:<width$}{}  {}{}{}",
-            fmt::dim(),
-            "channels",
-            fmt::reset(),
-            fmt::accent(),
-            channels_value,
-            fmt::reset(),
-            width = KW,
-        );
-    }
-
-    // Gateway URL (highlighted)
+    // Gateway URL
     if let Some(ref url) = info.gateway_url {
-        println!();
         println!(
             "  {}{:<width$}{}  {}{}{}",
             fmt::dim(),
@@ -185,7 +109,7 @@ pub fn print_boot_screen(info: &BootInfo) {
         let provider_tag = info
             .tunnel_provider
             .as_deref()
-            .map(|p| format!(" {}({}){}", fmt::dim(), p, fmt::reset()))
+            .map(|p| format!("  {}({}){}", fmt::dim(), p, fmt::reset()))
             .unwrap_or_default();
         println!(
             "  {}{:<width$}{}  {}{}{}{}",
@@ -199,6 +123,28 @@ pub fn print_boot_screen(info: &BootInfo) {
             width = KW,
         );
     }
+
+    // Non-default channels (skip if only the default set)
+    let non_default: Vec<&str> = info
+        .channels
+        .iter()
+        .filter(|c| !matches!(c.as_str(), "repl" | "gateway"))
+        .map(|c| c.as_str())
+        .collect();
+    if !non_default.is_empty() {
+        println!(
+            "  {}{:<width$}{}  {}{}{}",
+            fmt::dim(),
+            "channels",
+            fmt::reset(),
+            fmt::accent(),
+            non_default.join("  "),
+            fmt::reset(),
+            width = KW,
+        );
+    }
+
+    // ── Footer ────────────────────────────────────────────────────────
 
     println!();
     println!("{border}");
@@ -214,6 +160,13 @@ pub fn print_boot_screen(info: &BootInfo) {
         };
         println!("  {}ready in {}{}", fmt::dim(), elapsed_str, fmt::reset());
     }
+
+    // Hint to run `ironclaw status` for full details
+    println!(
+        "  {}Run `ironclaw status` for full system details.{}",
+        fmt::hint(),
+        fmt::reset()
+    );
 
     println!();
 }

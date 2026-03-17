@@ -20,11 +20,29 @@ fn colors_enabled() -> bool {
     std::io::stdout().is_terminal()
 }
 
+/// Returns `true` when the terminal supports 24-bit true-color.
+///
+/// Checks `$COLORTERM` for `truecolor` or `24bit`.
+fn truecolor_enabled() -> bool {
+    std::env::var("COLORTERM")
+        .map(|v| v.eq_ignore_ascii_case("truecolor") || v.eq_ignore_ascii_case("24bit"))
+        .unwrap_or(false)
+}
+
 // ── Color tokens ────────────────────────────────────────────
 
-/// Cyan accent — primary brand color.
+/// Emerald green accent — primary brand color.
+///
+/// Uses true-color `#34d399` when supported, falls back to basic green.
 pub fn accent() -> &'static str {
-    if colors_enabled() { "\x1b[36m" } else { "" }
+    if !colors_enabled() {
+        return "";
+    }
+    if truecolor_enabled() {
+        "\x1b[38;2;52;211;153m"
+    } else {
+        "\x1b[32m"
+    }
 }
 
 /// Bold text.
@@ -57,9 +75,23 @@ pub fn link() -> &'static str {
     if colors_enabled() { "\x1b[33;4m" } else { "" }
 }
 
-/// Bold cyan — commands and interactive elements.
-pub fn bold_cyan() -> &'static str {
-    if colors_enabled() { "\x1b[1;36m" } else { "" }
+/// Bold accent — commands and interactive elements.
+///
+/// Uses bold + true-color emerald when supported, falls back to bold green.
+pub fn bold_accent() -> &'static str {
+    if !colors_enabled() {
+        return "";
+    }
+    if truecolor_enabled() {
+        "\x1b[1;38;2;52;211;153m"
+    } else {
+        "\x1b[1;32m"
+    }
+}
+
+/// Dim italic — contextual tips and hints.
+pub fn hint() -> &'static str {
+    if colors_enabled() { "\x1b[2;3m" } else { "" }
 }
 
 /// Reset all attributes.

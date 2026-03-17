@@ -26,11 +26,12 @@ let currentSettingsSubtab = 'inference';
 // --- Streaming Debounce State ---
 let _streamBuffer = '';
 let _streamDebounceTimer = null;
-const STREAM_DEBOUNCE_MS = 150;
+const STREAM_DEBOUNCE_MS = 50;
 
 // --- Connection Status Banner State ---
 let _connectionLostTimer = null;
 let _connectionLostAt = null;
+let _reconnectAttempts = 0;
 
 // --- Send Cooldown State ---
 let _sendCooldown = false;
@@ -131,31 +132,8 @@ document.getElementById('token-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') authenticate();
 });
 
-// --- Static element event bindings (CSP-compliant, no inline handlers) ---
-document.getElementById('auth-connect-btn').addEventListener('click', () => authenticate());
-document.getElementById('restart-overlay').addEventListener('click', () => cancelRestart());
-document.getElementById('restart-close-btn').addEventListener('click', () => cancelRestart());
-document.getElementById('restart-cancel-btn').addEventListener('click', () => cancelRestart());
-document.getElementById('restart-confirm-btn').addEventListener('click', () => confirmRestart());
-document.getElementById('language-btn').addEventListener('click', () => toggleLanguageMenu());
-document.querySelectorAll('.language-option[data-lang]').forEach(btn => {
-  btn.addEventListener('click', () => switchLanguage(btn.dataset.lang));
-});
-document.getElementById('restart-btn').addEventListener('click', () => triggerRestart());
-document.getElementById('thread-new-btn').addEventListener('click', () => createNewThread());
-document.getElementById('thread-toggle-btn').addEventListener('click', () => toggleThreadSidebar());
-document.getElementById('assistant-thread').addEventListener('click', () => switchToAssistant());
-document.getElementById('send-btn').addEventListener('click', () => sendMessage());
-document.getElementById('memory-edit-btn').addEventListener('click', () => startMemoryEdit());
-document.getElementById('memory-save-btn').addEventListener('click', () => saveMemoryEdit());
-document.getElementById('memory-cancel-btn').addEventListener('click', () => cancelMemoryEdit());
-document.getElementById('logs-server-level').addEventListener('change', function() { setServerLogLevel(this.value); });
-document.getElementById('logs-pause-btn').addEventListener('click', () => toggleLogsPause());
-document.getElementById('logs-clear-btn').addEventListener('click', () => clearLogs());
-document.getElementById('wasm-install-btn').addEventListener('click', () => installWasmExtension());
-document.getElementById('mcp-add-btn').addEventListener('click', () => addMcpServer());
-document.getElementById('skill-search-btn').addEventListener('click', () => searchClawHub());
-document.getElementById('skill-install-btn').addEventListener('click', () => installSkillFromForm());
+// Note: main event listener registration is at the bottom of this file (search
+// "Event Listener Registration"). Do NOT add duplicate listeners here.
 
 // Auto-authenticate from URL param or saved session
 (function autoAuth() {
@@ -298,6 +276,7 @@ function connectSSE() {
   eventSource.onopen = () => {
     document.getElementById('sse-dot').classList.remove('disconnected');
     document.getElementById('sse-status').textContent = I18n.t('status.connected');
+    _reconnectAttempts = 0;
 
     // Dismiss connection-lost banner and show reconnected flash
     if (_connectionLostTimer) {
@@ -336,18 +315,25 @@ function connectSSE() {
   };
 
   eventSource.onerror = () => {
+    _reconnectAttempts++;
     document.getElementById('sse-dot').classList.add('disconnected');
     document.getElementById('sse-status').textContent = I18n.t('status.reconnecting');
 
+    // Update existing banner with attempt count
+    const existingBanner = document.getElementById('connection-banner');
+    if (existingBanner && existingBanner.classList.contains('connection-banner-warning')) {
+      existingBanner.textContent = 'Connection lost. Reconnecting... (attempt ' + _reconnectAttempts + ')';
+    }
+
     // Start connection-lost banner timer (3s delay)
-    if (!_connectionLostTimer && !document.getElementById('connection-banner')) {
+    if (!_connectionLostTimer && !existingBanner) {
       _connectionLostAt = _connectionLostAt || Date.now();
       _connectionLostTimer = setTimeout(() => {
         _connectionLostTimer = null;
         // Only show if still disconnected
         const dot = document.getElementById('sse-dot');
         if (dot?.classList.contains('disconnected')) {
-          showConnectionBanner('Connection lost. Reconnecting...', 'warning');
+          showConnectionBanner('Connection lost. Reconnecting... (attempt ' + _reconnectAttempts + ')', 'warning');
         }
       }, 3000);
     }
@@ -442,8 +428,13 @@ function connectSSE() {
     }
     if (lastAssistant) lastAssistant.setAttribute('data-streaming', 'true');
 
-    // Accumulate chunks and debounce rendering at 150ms intervals
+    // Accumulate chunks and debounce rendering at 50ms intervals
     _streamBuffer += data.content;
+    // Force flush when buffer exceeds 10K chars to prevent memory buildup
+    if (_streamBuffer.length > 10000) {
+      appendToLastAssistant(_streamBuffer);
+      _streamBuffer = '';
+    }
     if (!_streamDebounceTimer) {
       _streamDebounceTimer = setInterval(() => {
         if (_streamBuffer) {
@@ -527,6 +518,20 @@ function connectSSE() {
       finalizeActivityGroup();
       addMessage('system', 'Error: ' + data.message);
       enableChatInput();
+    }
+  });
+
+  eventSource.addEventListener('turn_cost', (e) => {
+    const event = JSON.parse(e.data);
+    // Add cost badge below last assistant message
+    const messages = document.querySelectorAll('.message.assistant');
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg && event.tokens) {
+      const badge = document.createElement('div');
+      badge.className = 'turn-cost-badge';
+      const cost = event.cost ? ' \u00b7 $' + event.cost.toFixed(4) : '';
+      badge.textContent = event.tokens.toLocaleString() + ' tokens' + cost;
+      lastMsg.appendChild(badge);
     }
   });
 
@@ -980,6 +985,14 @@ function appendToLastAssistant(chunk) {
     const content = last.querySelector('.message-content');
     if (content) {
       content.innerHTML = renderMarkdown(raw);
+      // Syntax highlighting for code blocks
+      if (typeof hljs !== 'undefined') {
+        requestAnimationFrame(() => {
+          content.querySelectorAll('pre code').forEach(block => {
+            hljs.highlightElement(block);
+          });
+        });
+      }
     }
     container.scrollTop = container.scrollHeight;
   } else {
@@ -1621,6 +1634,13 @@ function loadHistory(before) {
   const isPaginating = !!before;
   if (isPaginating) loadingOlder = true;
 
+  // Show skeleton while loading (only for fresh loads)
+  if (!isPaginating) {
+    const chatContainer = document.getElementById('chat-messages');
+    chatContainer.innerHTML = '';
+    chatContainer.appendChild(renderSkeleton('message', 3));
+  }
+
   apiFetch(historyUrl).then((data) => {
     const container = document.getElementById('chat-messages');
 
@@ -1688,6 +1708,25 @@ function createMessageElement(role, content) {
   const div = document.createElement('div');
   div.className = 'message ' + role;
 
+  // Message content
+  const contentEl = document.createElement('div');
+  contentEl.className = 'message-content';
+  if (role === 'user' || role === 'system') {
+    contentEl.textContent = content;
+  } else {
+    div.setAttribute('data-raw', content);
+    contentEl.innerHTML = renderMarkdown(content);
+    // Syntax highlighting for code blocks
+    if (typeof hljs !== 'undefined') {
+      requestAnimationFrame(() => {
+        contentEl.querySelectorAll('pre code').forEach(block => {
+          hljs.highlightElement(block);
+        });
+      });
+    }
+  }
+  div.appendChild(contentEl);
+
   if (role === 'assistant' || role === 'user') {
     div.classList.add('has-copy');
     div.setAttribute('data-copy-text', content);
@@ -1703,15 +1742,6 @@ function createMessageElement(role, content) {
     div.appendChild(copyBtn);
   }
 
-  const body = document.createElement('div');
-  body.className = 'message-content';
-  if (role === 'user' || role === 'system') {
-    body.textContent = content;
-  } else {
-    div.setAttribute('data-raw', content);
-    body.innerHTML = renderMarkdown(content);
-  }
-  div.appendChild(body);
   return div;
 }
 
@@ -1809,6 +1839,13 @@ function debouncedLoadThreads() {
 }
 
 function loadThreads() {
+  // Show skeleton while loading
+  const threadListEl = document.getElementById('thread-list');
+  if (threadListEl && threadListEl.children.length === 0) {
+    threadListEl.innerHTML = '';
+    threadListEl.appendChild(renderSkeleton('row', 4));
+  }
+
   apiFetch('/api/chat/threads').then((data) => {
     // Pinned assistant thread
     if (data.assistant_thread) {
@@ -4739,6 +4776,19 @@ function renderCardsSkeleton(count) {
   return html;
 }
 
+function renderSkeleton(type, count) {
+  count = count || 3;
+  var container = document.createElement('div');
+  container.className = 'skeleton-container';
+  for (var i = 0; i < count; i++) {
+    var el = document.createElement('div');
+    el.className = 'skeleton-' + type;
+    el.innerHTML = '<div class="skeleton-bar shimmer"></div>';
+    container.appendChild(el);
+  }
+  return container;
+}
+
 function loadInferenceSettings() {
   var container = document.getElementById('settings-inference-content');
   container.innerHTML = renderSettingsSkeleton(6);
@@ -5255,31 +5305,72 @@ function showWelcomeCard() {
   card.className = 'welcome-card';
 
   const heading = document.createElement('h2');
-  heading.textContent = 'Welcome to IronClaw';
+  heading.className = 'welcome-heading';
+  heading.textContent = I18n.t('welcome.heading');
   card.appendChild(heading);
 
   const desc = document.createElement('p');
-  desc.textContent = 'Your secure AI assistant. Try one of these:';
+  desc.className = 'welcome-description';
+  desc.textContent = I18n.t('welcome.description');
   card.appendChild(desc);
 
   const chips = document.createElement('div');
-  chips.className = 'suggestion-chips welcome-chips';
+  chips.className = 'welcome-chips';
 
   const suggestions = [
-    'What can you help me with?',
-    'Search my workspace memory',
-    'Show system status'
+    { key: 'welcome.runTool', fallback: 'Run a tool' },
+    { key: 'welcome.checkJobs', fallback: 'Check job status' },
+    { key: 'welcome.searchMemory', fallback: 'Search memory' },
+    { key: 'welcome.manageRoutines', fallback: 'Manage routines' },
+    { key: 'welcome.systemStatus', fallback: 'System status' },
+    { key: 'welcome.writeCode', fallback: 'Write code' },
   ];
-  suggestions.forEach(text => {
+  suggestions.forEach(({ key, fallback }) => {
     const chip = document.createElement('button');
-    chip.className = 'chip';
-    chip.textContent = text;
+    chip.className = 'welcome-chip';
+    chip.textContent = I18n.t(key) || fallback;
     chip.addEventListener('click', () => sendSuggestion(chip));
     chips.appendChild(chip);
   });
 
   card.appendChild(chips);
   container.appendChild(card);
+}
+
+function renderEmptyState({ icon, title, hint, action }) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'empty-state-card';
+
+  if (icon) {
+    const iconEl = document.createElement('div');
+    iconEl.className = 'empty-state-icon';
+    iconEl.textContent = icon;
+    wrapper.appendChild(iconEl);
+  }
+
+  if (title) {
+    const titleEl = document.createElement('div');
+    titleEl.className = 'empty-state-title';
+    titleEl.textContent = title;
+    wrapper.appendChild(titleEl);
+  }
+
+  if (hint) {
+    const hintEl = document.createElement('div');
+    hintEl.className = 'empty-state-hint';
+    hintEl.textContent = hint;
+    wrapper.appendChild(hintEl);
+  }
+
+  if (action) {
+    const btn = document.createElement('button');
+    btn.className = 'empty-state-action';
+    btn.textContent = action.label || 'Go';
+    if (action.onClick) btn.addEventListener('click', action.onClick);
+    wrapper.appendChild(btn);
+  }
+
+  return wrapper;
 }
 
 function sendSuggestion(btn) {

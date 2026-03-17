@@ -14,7 +14,6 @@ use crate::settings::Settings;
 pub async fn run_doctor_command() -> anyhow::Result<()> {
     println!();
     println!("  {}IronClaw Doctor{}", fmt::bold(), fmt::reset());
-    println!();
 
     let mut passed = 0u32;
     let mut failed = 0u32;
@@ -23,7 +22,9 @@ pub async fn run_doctor_command() -> anyhow::Result<()> {
     // Load settings once for checks that need them.
     let settings = Settings::load();
 
-    // ── Settings & core config ─────────────────────────────────
+    // ── Core ─────────────────────────────────────────────────
+
+    section_header("Core");
 
     check(
         "Settings file",
@@ -65,7 +66,9 @@ pub async fn run_doctor_command() -> anyhow::Result<()> {
         &mut skipped,
     );
 
-    // ── Subsystem configuration checks ─────────────────────────
+    // ── Features ─────────────────────────────────────────────
+
+    section_header("Features");
 
     check(
         "Embeddings",
@@ -123,7 +126,9 @@ pub async fn run_doctor_command() -> anyhow::Result<()> {
         &mut skipped,
     );
 
-    // ── External binary checks ────────────────────────────────
+    // ── External ─────────────────────────────────────────────
+
+    section_header("External");
 
     check(
         "Docker daemon",
@@ -178,6 +183,14 @@ pub async fn run_doctor_command() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+/// Print a section header with a separator and bold group name.
+fn section_header(name: &str) {
+    println!();
+    println!("  {}", fmt::separator(36));
+    println!("  {}{}{}", fmt::bold(), name, fmt::reset());
+    println!();
 }
 
 // ── Individual checks ───────────────────────────────────────

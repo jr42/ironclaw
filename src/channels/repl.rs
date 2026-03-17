@@ -263,22 +263,29 @@ impl Default for ReplChannel {
 
 fn print_help() {
     let h = fmt::bold();
-    let c = fmt::bold_cyan();
+    let c = fmt::bold_accent();
     let d = fmt::dim();
     let r = fmt::reset();
+    let hi = fmt::hint();
 
     println!();
     println!("  {h}IronClaw REPL{r}");
     println!();
+    println!("  {h}Quick start{r}");
+    println!("    {c}/new{r}         {hi}Start a new thread{r}");
+    println!("    {c}/compact{r}     {hi}Compress context window{r}");
+    println!("    {c}/quit{r}        {hi}Exit{r}");
+    println!();
+    println!("  {h}All commands{r}");
     println!(
-        "  {h}Conversation{r}  {c}/new{r} {c}/clear{r} {c}/compact{r} {c}/undo{r} {c}/redo{r} {c}/summarize{r} {c}/suggest{r}"
+        "    {d}Conversation{r}  {c}/new{r} {c}/clear{r} {c}/compact{r} {c}/undo{r} {c}/redo{r} {c}/summarize{r} {c}/suggest{r}"
     );
-    println!("  {h}Threads{r}       {c}/thread{r} {c}/resume{r} {c}/list{r}");
-    println!("  {h}Execution{r}     {c}/interrupt{r} {d}(esc){r} {c}/cancel{r}");
+    println!("    {d}Threads{r}       {c}/thread{r} {c}/resume{r} {c}/list{r}");
+    println!("    {d}Execution{r}     {c}/interrupt{r} {d}(esc){r} {c}/cancel{r}");
     println!(
-        "  {h}System{r}        {c}/tools{r} {c}/model{r} {c}/version{r} {c}/status{r} {c}/debug{r} {c}/heartbeat{r}"
+        "    {d}System{r}        {c}/tools{r} {c}/model{r} {c}/version{r} {c}/status{r} {c}/debug{r} {c}/heartbeat{r}"
     );
-    println!("  {h}Session{r}       {c}/help{r} {c}/quit{r}");
+    println!("    {d}Session{r}       {c}/help{r} {c}/quit{r}");
     println!();
 }
 
@@ -360,11 +367,11 @@ impl Channel for ReplChannel {
                         "{}[debug]{} {}\u{203A}{} ",
                         fmt::warning(),
                         fmt::reset(),
-                        fmt::bold_cyan(),
+                        fmt::bold_accent(),
                         fmt::reset()
                     )
                 } else {
-                    format!("{}\u{203A}{} ", fmt::bold_cyan(), fmt::reset())
+                    format!("{}\u{203A}{} ", fmt::bold_accent(), fmt::reset())
                 };
 
                 match rl.readline(&prompt) {

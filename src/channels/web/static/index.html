@@ -25,6 +25,8 @@
     integrity="sha384-pN9zSKOnTZwXRtYZAu0PBPEgR2B7DOC1aeLxQ33oJ0oy5iN1we6gm57xldM2irDG"
     crossorigin="anonymous"
   ></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css" integrity="sha384-nPUMD0OGWP8WN5HZqXBhBuaYYraH1FbflEfCt2xhUfiEBiZB/ccPbQefNnGMwWOE" crossorigin="anonymous">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha384-xBsHBR6BS/LSlO+cYiY6OJnFE/Q2Bif4oMCwmTAFDBXS/GgQe2q20B6LBpI6UJQ" crossorigin="anonymous"></script>
 </head>
 <body>
   <!-- Auth Screen -->
@@ -122,7 +124,7 @@
         <div class="gateway-popover" id="gateway-popover"></div>
       </div>
       <button class="restart-btn" id="restart-btn" data-i18n="status.restartTooltip"
-        data-i18n-attr="title" title="Gracefully restart the process" style="display: none;">
+        data-i18n-attr="title" title="Gracefully restart the process" aria-label="Restart" style="display: none;">
         <svg id="restart-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M23 4v6h-6"></path>
           <path d="M1 20v-6h6"></path>
@@ -143,14 +145,14 @@
           <span data-i18n="chat.conversations">Conversations</span>
           <div class="spacer"></div>
           <button class="thread-new-btn" id="thread-new-btn" data-i18n="chat.newThread" data-i18n-attr="title"
-            title="New thread (Ctrl/Cmd+N)">+</button>
+            title="New thread (Ctrl/Cmd+N)" aria-label="New thread">+</button>
           <button class="thread-toggle-btn" id="thread-toggle-btn" data-i18n="chat.toggleSidebar"
-            data-i18n-attr="title" title="Toggle sidebar">&laquo;</button>
+            data-i18n-attr="title" title="Toggle sidebar" aria-label="Toggle sidebar">&laquo;</button>
         </div>
         <div class="thread-list" id="thread-list"></div>
       </div>
       <div class="chat-container">
-        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-messages" id="chat-messages" aria-live="polite" aria-relevant="additions"></div>
         <div id="slash-autocomplete" class="slash-autocomplete" style="display:none"></div>
         <div id="suggestion-chips" class="suggestion-chips" style="display:none"></div>
         <div class="chat-input">
@@ -391,7 +393,7 @@
     </div>
   </div>
 
-  <div id="toasts"></div>
+  <div id="toasts" aria-live="assertive"></div>
   <script src="/app.js"></script>
   <script src="/i18n-app.js"></script>
 </body>
